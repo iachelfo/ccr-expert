@@ -673,9 +673,71 @@ function ReportPreview({ onNavigate }: { onNavigate: (tab: Tab) => void }) {
   const data = MOCK_ANALYSIS;
   const criticals = data.alerts.filter((a) => a.level === "critical");
   const warnings = data.alerts.filter((a) => a.level === "warning");
+  const [toast, setToast] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const handleShare = async () => {
+    const shareData = {
+      title: `Laudo Pericial - ${data.contractType} ${data.contractId}`,
+      text: `Relatório de análise de conformidade - ${data.contractType} ${data.contractId}`,
+      url: window.location.href,
+    };
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData);
+      } catch (e) {
+        if ((e as Error).name !== "AbortError") {
+          await navigator.clipboard.writeText(window.location.href);
+          showToast("Link copiado para a área de transferência!");
+        }
+      }
+    } else {
+      await navigator.clipboard.writeText(window.location.href);
+      showToast("Link copiado para a área de transferência!");
+    }
+  };
+
+  const handleDownload = (format: "pdf" | "docx") => {
+    const reportEl = document.getElementById("report-content");
+    if (!reportEl) return;
+
+    const content = reportEl.innerText;
+    const blob = new Blob(
+      [format === "docx"
+        ? `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Laudo Pericial - ${data.contractType} ${data.contractId}</title></head><body>${reportEl.innerHTML}</body></html>`
+        : content
+      ],
+      { type: format === "docx" ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document" : "text/plain;charset=utf-8" }
+    );
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `laudo_${data.contractType}_${data.contractId}.${format === "pdf" ? "txt" : "doc"}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast(`Download iniciado (${format.toUpperCase()})! Em produção, será gerado o ${format.toUpperCase()} formatado.`);
+  };
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
+      {/* Toast notification */}
+      {toast && (
+        <div className="fixed top-4 right-4 z-50 bg-gray-900 text-white px-4 py-3 rounded-lg shadow-lg text-sm animate-fade-in flex items-center gap-2">
+          <CheckCircle className="w-4 h-4 text-green-400" />
+          {toast}
+        </div>
+      )}
+
       {/* Toolbar */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
         <div className="flex flex-col sm:flex-row sm:items-center gap-3">
@@ -683,16 +745,16 @@ function ReportPreview({ onNavigate }: { onNavigate: (tab: Tab) => void }) {
             <ChevronLeft className="w-4 h-4" /> Voltar
           </button>
           <div className="sm:ml-auto flex flex-wrap gap-2">
-            <button className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors cursor-pointer">
+            <button onClick={() => handleDownload("pdf")} className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors cursor-pointer">
               <Download className="w-4 h-4" /> Baixar PDF
             </button>
-            <button className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors cursor-pointer">
+            <button onClick={() => handleDownload("docx")} className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors cursor-pointer">
               <FileText className="w-4 h-4" /> Baixar DOCX
             </button>
-            <button className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors cursor-pointer">
+            <button onClick={handlePrint} className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors cursor-pointer">
               <Printer className="w-4 h-4" /> Imprimir
             </button>
-            <button className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors cursor-pointer">
+            <button onClick={handleShare} className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors cursor-pointer">
               <Share2 className="w-4 h-4" /> Compartilhar
             </button>
           </div>
@@ -708,7 +770,7 @@ function ReportPreview({ onNavigate }: { onNavigate: (tab: Tab) => void }) {
         </div>
 
         {/* Document content */}
-        <div className="px-8 sm:px-12 py-10 space-y-8 text-sm text-gray-800 leading-relaxed">
+        <div id="report-content" className="px-8 sm:px-12 py-10 space-y-8 text-sm text-gray-800 leading-relaxed">
           {/* Title */}
           <div className="text-center border-b border-gray-200 pb-8">
             <p className="text-xs text-gray-400 uppercase tracking-widest mb-2">Relatorio Tecnico</p>
