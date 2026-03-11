@@ -1,4 +1,5 @@
 import { useState } from "react";
+import html2pdf from "html2pdf.js";
 import {
   Upload,
   FileText,
@@ -705,27 +706,36 @@ function ReportPreview({ onNavigate }: { onNavigate: (tab: Tab) => void }) {
     }
   };
 
-  const handleDownload = (format: "pdf" | "docx") => {
+  const handleDownloadPdf = () => {
     const reportEl = document.getElementById("report-content");
     if (!reportEl) return;
+    showToast("Gerando PDF...");
+    const opt = {
+      margin: [10, 10, 10, 10] as [number, number, number, number],
+      filename: `laudo_${data.contractType}_${data.contractId}.pdf`,
+      image: { type: "jpeg" as const, quality: 0.98 },
+      html2canvas: { scale: 2 },
+      jsPDF: { unit: "mm" as const, format: "a4" as const, orientation: "portrait" as const },
+    };
+    html2pdf().set(opt).from(reportEl).save().then(() => {
+      showToast("PDF salvo com sucesso!");
+    });
+  };
 
-    const content = reportEl.innerText;
-    const blob = new Blob(
-      [format === "docx"
-        ? `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Laudo Pericial - ${data.contractType} ${data.contractId}</title></head><body>${reportEl.innerHTML}</body></html>`
-        : content
-      ],
-      { type: format === "docx" ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document" : "text/plain;charset=utf-8" }
-    );
+  const handleDownloadDocx = () => {
+    const reportEl = document.getElementById("report-content");
+    if (!reportEl) return;
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Laudo Pericial - ${data.contractType} ${data.contractId}</title><style>body{font-family:Calibri,sans-serif;font-size:11pt;line-height:1.5;color:#1a1a1a}h1{font-size:16pt}h2{font-size:13pt}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccc;padding:6px 8px;text-align:left}</style></head><body>${reportEl.innerHTML}</body></html>`;
+    const blob = new Blob(["\ufeff", html], { type: "application/msword" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `laudo_${data.contractType}_${data.contractId}.${format === "pdf" ? "txt" : "doc"}`;
+    a.download = `laudo_${data.contractType}_${data.contractId}.doc`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    showToast(`Download iniciado (${format.toUpperCase()})! Em produção, será gerado o ${format.toUpperCase()} formatado.`);
+    showToast("Documento Word salvo com sucesso!");
   };
 
   return (
@@ -745,10 +755,10 @@ function ReportPreview({ onNavigate }: { onNavigate: (tab: Tab) => void }) {
             <ChevronLeft className="w-4 h-4" /> Voltar
           </button>
           <div className="sm:ml-auto flex flex-wrap gap-2">
-            <button onClick={() => handleDownload("pdf")} className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors cursor-pointer">
+            <button onClick={handleDownloadPdf} className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors cursor-pointer">
               <Download className="w-4 h-4" /> Baixar PDF
             </button>
-            <button onClick={() => handleDownload("docx")} className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors cursor-pointer">
+            <button onClick={handleDownloadDocx} className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors cursor-pointer">
               <FileText className="w-4 h-4" /> Baixar DOCX
             </button>
             <button onClick={handlePrint} className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors cursor-pointer">
