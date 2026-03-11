@@ -1147,6 +1147,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [selectedAlertIdx, setSelectedAlertIdx] = useState(0);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   const handleAlertSelect = (idx: number) => {
     setSelectedAlertIdx(idx);
@@ -1207,7 +1208,7 @@ export default function App() {
           <div className="bg-gradient-to-br from-blue-50 to-violet-50 rounded-lg p-4">
             <p className="text-xs font-semibold text-blue-800 mb-1">Plano Profissional</p>
             <p className="text-xs text-gray-500 mb-3">50 analises/mes &middot; Relatorio completo</p>
-            <button className="w-full text-xs font-medium text-blue-700 bg-white border border-blue-200 rounded-lg py-1.5 hover:bg-blue-50 transition-colors cursor-pointer">
+            <button onClick={() => setShowUpgradeModal(true)} className="w-full text-xs font-medium text-blue-700 bg-white border border-blue-200 rounded-lg py-1.5 hover:bg-blue-50 transition-colors cursor-pointer">
               Upgrade
             </button>
           </div>
@@ -1236,6 +1237,53 @@ export default function App() {
           {activeTab === "report" && <ReportPreview onNavigate={setActiveTab} />}
         </main>
       </div>
+
+      {/* Upgrade Modal */}
+      {showUpgradeModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setShowUpgradeModal(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden animate-fade-in" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-gradient-to-r from-blue-600 to-violet-600 px-6 py-8 text-center">
+              <div className="w-14 h-14 rounded-full bg-white/20 flex items-center justify-center mx-auto mb-3">
+                <TrendingUp className="w-7 h-7 text-white" />
+              </div>
+              <h2 className="text-xl font-bold text-white">Plano Profissional</h2>
+              <p className="text-blue-100 text-sm mt-1">Desbloqueie todo o potencial do CCR Expert</p>
+            </div>
+            <div className="px-6 py-5 space-y-3">
+              {[
+                "50 analises por mes",
+                "Relatorios completos sem marca d'agua",
+                "Exportacao em PDF, DOCX e impressao",
+                "Suporte prioritario",
+                "Historico ilimitado de contratos",
+              ].map((item, i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <CheckCircle className="w-5 h-5 text-emerald-500 flex-shrink-0" />
+                  <span className="text-sm text-gray-700">{item}</span>
+                </div>
+              ))}
+            </div>
+            <div className="px-6 pb-6 pt-2 space-y-3">
+              <div className="text-center">
+                <span className="text-3xl font-bold text-gray-900">R$ 97</span>
+                <span className="text-sm text-gray-500">/mes</span>
+              </div>
+              <button
+                onClick={() => setShowUpgradeModal(false)}
+                className="w-full py-3 bg-gradient-to-r from-blue-600 to-violet-600 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-violet-700 transition-all cursor-pointer"
+              >
+                Em breve &mdash; Notifique-me
+              </button>
+              <button
+                onClick={() => setShowUpgradeModal(false)}
+                className="w-full py-2 text-sm text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+              >
+                Continuar no plano gratuito
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
