@@ -10,7 +10,6 @@ import {
   ChevronRight,
   ChevronLeft,
   Search,
-  Shield,
   Scale,
   Clock,
   TrendingUp,
@@ -1180,9 +1179,7 @@ export default function App() {
       <aside className={`fixed lg:static inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200 flex flex-col transition-transform lg:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
         <div className="p-5 border-b border-gray-100">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center">
-              <Shield className="w-5 h-5 text-white" />
-            </div>
+            <img src="/chelfo-logo.png" alt="Chelfo" className="h-10 w-auto" />
             <div>
               <h1 className="font-bold text-gray-900 leading-tight">CCR Expert</h1>
               <p className="text-xs text-gray-400">Analisador de Credito Rural</p>
