@@ -503,7 +503,7 @@ function AnalysisResults({ onNavigate, onAlertSelect }: { onNavigate: (tab: Tab)
             <button onClick={() => onNavigate("report")} className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors cursor-pointer">
               <Download className="w-4 h-4" /> Exportar PDF
             </button>
-            <button className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors cursor-pointer">
+            <button onClick={() => onNavigate("review")} className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors cursor-pointer">
               <Eye className="w-4 h-4" /> Ver Contrato
             </button>
           </div>
