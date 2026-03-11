@@ -1,5 +1,5 @@
 import { useState } from "react";
-import html2pdf from "html2pdf.js";
+import { jsPDF } from "jspdf";
 import {
   Upload,
   FileText,
@@ -240,10 +240,10 @@ function Dashboard({ onNavigate }: { onNavigate: (tab: Tab) => void }) {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard icon={FileText} label="Total de Analises" value={47} color="bg-blue-600" />
-        <StatCard icon={AlertTriangle} label="Irregularidades" value={31} color="bg-red-500" />
-        <StatCard icon={Clock} label="Tempo Medio" value="1m 42s" color="bg-violet-500" />
-        <StatCard icon={TrendingUp} label="Taxa Deteccao" value="96%" color="bg-emerald-500" />
+        <StatCard icon={FileText} label="Contratos Analisados" value={47} color="bg-blue-600" />
+        <StatCard icon={AlertTriangle} label="Irregularidades Encontradas" value={31} color="bg-red-500" />
+        <StatCard icon={Clock} label="Tempo Medio por Analise" value="1m 42s" color="bg-violet-500" />
+        <StatCard icon={TrendingUp} label="Taxa de Conformidade" value="96%" color="bg-emerald-500" />
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
@@ -706,26 +706,262 @@ function ReportPreview({ onNavigate }: { onNavigate: (tab: Tab) => void }) {
     }
   };
 
-  const handleDownloadPdf = () => {
-    const reportEl = document.getElementById("report-content");
-    if (!reportEl) return;
-    showToast("Gerando PDF...");
-    const opt = {
-      margin: [10, 10, 10, 10] as [number, number, number, number],
-      filename: `laudo_${data.contractType}_${data.contractId}.pdf`,
-      image: { type: "jpeg" as const, quality: 0.98 },
-      html2canvas: { scale: 2 },
-      jsPDF: { unit: "mm" as const, format: "a4" as const, orientation: "portrait" as const },
+  const generateReportLines = () => {
+    const allAlerts = [...criticals, ...warnings];
+    const today = new Date().toLocaleDateString("pt-BR");
+    return {
+      title: "RELATORIO TECNICO - ANALISE DE CONFORMIDADE",
+      subtitle: `${data.contractType} Nr. ${data.contractId}`,
+      meta: `${data.institution} | Data: ${data.date} | Emitido: ${today}`,
+      sections: [
+        {
+          heading: "1. IDENTIFICACAO DO CONTRATO",
+          lines: [
+            `Contrato: ${data.contractId}`,
+            `Tipo: ${data.contractType} (Cedula de Credito Bancario)`,
+            `Instituicao: ${data.institution}`,
+            `Data: ${data.date}`,
+            `Valor: ${data.amount}`,
+            `Emitente: Fazenda Boa Esperanca Ltda.`,
+          ],
+        },
+        {
+          heading: "2. CLASSIFICACAO DOS RECURSOS",
+          lines: [
+            `Classificacao: ${data.resourceOrigin}`,
+            `O contrato foi formalizado como CCB (recursos livres), porem a analise identificou indicadores de credito direcionado: mencao a SICOR, finalidade de investimento rural, e referencia ao programa PRONAMP.`,
+          ],
+        },
+        {
+          heading: "3. VERIFICACAO DE CONFORMIDADE (TAXAS)",
+          lines: [
+            `Juros remuneratorios: 14,5% a.a. | Limite: 12,0% a.a. | IRREGULAR`,
+            `Teto PRONAMP: 14,5% a.a. | Limite: 8,5% a.a. | IRREGULAR`,
+            `Juros de mora: 1,0% a.m. | Limite: 1,0% a.m. | REGULAR`,
+            `Multa moratoria: 2,0% | Limite: 2,0% | REGULAR`,
+          ],
+        },
+        {
+          heading: "4. IRREGULARIDADES IDENTIFICADAS",
+          lines: allAlerts.map((a) => `[${a.code}] ${a.title}\n${a.description}\nFundamento: ${a.legalBasis}`),
+        },
+        {
+          heading: "5. CONCLUSAO",
+          lines: [
+            `A analise do contrato ${data.contractType} Nr. ${data.contractId} identificou ${criticals.length} irregularidade(s) critica(s) e ${warnings.length} ponto(s) de atencao.`,
+            `Recomenda-se a revisao contratual com possibilidade de acao revisional para adequacao dos encargos aos limites legais aplicaveis ao credito rural.`,
+          ],
+        },
+        {
+          heading: "6. FUNDAMENTACAO JURIDICA",
+          lines: [
+            `Art. 5, Decreto-Lei 167/1967 - Limite de juros para credito rural`,
+            `Lei 4.829/1965 - Institucionalizacao do credito rural`,
+            `Resolucao CMN 5.080/2023 - Manual de Credito Rural`,
+            `Art. 51, IV, CDC - Clausulas abusivas`,
+            `REsp 1.112.879/PR - Juros sujeitos a limites do DL 167/67`,
+          ],
+        },
+      ],
+      disclaimer: `Este relatorio foi gerado pelo sistema CCR Expert e tem carater informativo. Os resultados devem ser validados por profissional habilitado antes de utilizacao em procedimentos judiciais ou extrajudiciais.`,
+      footer: `Elaborado por Carlos Chelfo | Todos os Direitos Reservados | Instagram: @Prof.CarlosChelfo`,
     };
-    html2pdf().set(opt).from(reportEl).save().then(() => {
-      showToast("PDF salvo com sucesso!");
-    });
+  };
+
+  const handleDownloadPdf = () => {
+    showToast("Gerando PDF...");
+    const report = generateReportLines();
+    const doc = new jsPDF({ unit: "mm", format: "a4" });
+    const pageW = doc.internal.pageSize.getWidth();
+    const pageH = doc.internal.pageSize.getHeight();
+    const marginL = 20;
+    const marginR = 20;
+    const maxW = pageW - marginL - marginR;
+    let y = 20;
+
+    const checkPage = (need: number) => {
+      if (y + need > pageH - 25) {
+        doc.addPage();
+        y = 20;
+        // header line on new pages
+        doc.setDrawColor(30, 64, 175);
+        doc.setLineWidth(0.5);
+        doc.line(marginL, 15, pageW - marginR, 15);
+        y = 22;
+      }
+    };
+
+    const addFooter = (pageNum: number, totalPages: number) => {
+      doc.setFontSize(7);
+      doc.setTextColor(150);
+      doc.text(report.footer, pageW / 2, pageH - 8, { align: "center" });
+      doc.text(`Pagina ${pageNum} de ${totalPages}`, pageW - marginR, pageH - 8, { align: "right" });
+    };
+
+    // ── Header bar
+    doc.setFillColor(30, 64, 175);
+    doc.rect(0, 0, pageW, 3, "F");
+
+    // ── Title block
+    doc.setFontSize(8);
+    doc.setTextColor(120);
+    doc.text("CCR EXPERT  |  ANALISE DE CREDITO RURAL", marginL, y);
+    y += 10;
+
+    doc.setFontSize(18);
+    doc.setTextColor(30, 30, 30);
+    doc.setFont("helvetica", "bold");
+    doc.text("Relatorio de Conformidade", marginL, y);
+    y += 8;
+
+    doc.setFontSize(12);
+    doc.setTextColor(60);
+    doc.setFont("helvetica", "normal");
+    doc.text(report.subtitle, marginL, y);
+    y += 6;
+
+    doc.setFontSize(9);
+    doc.setTextColor(120);
+    doc.text(report.meta, marginL, y);
+    y += 4;
+
+    // separator
+    doc.setDrawColor(30, 64, 175);
+    doc.setLineWidth(0.8);
+    doc.line(marginL, y, pageW - marginR, y);
+    y += 10;
+
+    // ── Sections
+    for (const section of report.sections) {
+      checkPage(20);
+
+      // Section heading with accent
+      doc.setFillColor(239, 246, 255);
+      doc.roundedRect(marginL, y - 3, maxW, 8, 1, 1, "F");
+      doc.setFontSize(10);
+      doc.setTextColor(30, 64, 175);
+      doc.setFont("helvetica", "bold");
+      doc.text(section.heading, marginL + 3, y + 2);
+      y += 10;
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(50);
+
+      for (const line of section.lines) {
+        const parts = line.split("\n");
+        for (const part of parts) {
+          checkPage(6);
+          const wrapped = doc.splitTextToSize(part, maxW - 4);
+          for (const wl of wrapped) {
+            checkPage(5);
+            doc.text(wl, marginL + 3, y);
+            y += 4.5;
+          }
+        }
+        y += 2;
+      }
+      y += 4;
+    }
+
+    // ── Disclaimer
+    checkPage(20);
+    doc.setDrawColor(200);
+    doc.setLineWidth(0.3);
+    doc.line(marginL, y, pageW - marginR, y);
+    y += 6;
+    doc.setFontSize(7);
+    doc.setTextColor(150);
+    doc.setFont("helvetica", "italic");
+    const discLines = doc.splitTextToSize(report.disclaimer, maxW);
+    for (const dl of discLines) {
+      checkPage(4);
+      doc.text(dl, marginL, y);
+      y += 3.5;
+    }
+
+    // ── Add footers to all pages
+    const totalPages = doc.getNumberOfPages();
+    for (let i = 1; i <= totalPages; i++) {
+      doc.setPage(i);
+      addFooter(i, totalPages);
+    }
+
+    doc.save(`laudo_${data.contractType}_${data.contractId}.pdf`);
+    showToast("PDF salvo com sucesso!");
   };
 
   const handleDownloadDocx = () => {
-    const reportEl = document.getElementById("report-content");
-    if (!reportEl) return;
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Laudo Pericial - ${data.contractType} ${data.contractId}</title><style>body{font-family:Calibri,sans-serif;font-size:11pt;line-height:1.5;color:#1a1a1a}h1{font-size:16pt}h2{font-size:13pt}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccc;padding:6px 8px;text-align:left}</style></head><body>${reportEl.innerHTML}</body></html>`;
+    const report = generateReportLines();
+    const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>
+  @page { margin: 2cm; }
+  body { font-family: 'Calibri', 'Segoe UI', sans-serif; font-size: 11pt; line-height: 1.6; color: #1a1a1a; }
+  .header-bar { background: #1e40af; height: 4px; margin: -2cm -2cm 20px -2cm; }
+  .brand { font-size: 9pt; color: #888; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 10px; }
+  h1 { font-size: 22pt; color: #111; margin: 0 0 4px 0; font-weight: 700; }
+  .subtitle { font-size: 14pt; color: #444; margin: 0 0 4px 0; }
+  .meta { font-size: 9pt; color: #888; margin-bottom: 16px; }
+  .divider { border: none; border-top: 2px solid #1e40af; margin: 16px 0; }
+  h2 { font-size: 12pt; color: #1e40af; background: #eff6ff; padding: 6px 10px; border-radius: 4px; margin: 20px 0 10px 0; }
+  .field { margin: 4px 0; }
+  .field-label { color: #666; }
+  .field-value { font-weight: 600; }
+  table { border-collapse: collapse; width: 100%; margin: 10px 0; }
+  th { background: #f8fafc; color: #444; font-size: 10pt; text-align: left; padding: 8px 10px; border-bottom: 2px solid #e2e8f0; }
+  td { padding: 6px 10px; border-bottom: 1px solid #f1f5f9; font-size: 10pt; }
+  .status-irregular { color: #dc2626; font-weight: 600; }
+  .status-regular { color: #16a34a; font-weight: 600; }
+  .alert-block { border-left: 3px solid #dc2626; padding: 8px 12px; margin: 8px 0; background: #fef2f2; }
+  .alert-code { font-weight: 700; color: #111; }
+  .alert-basis { font-size: 9pt; color: #1e40af; margin-top: 4px; }
+  .conclusion { background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; padding: 12px 16px; }
+  .disclaimer { font-size: 8pt; color: #999; border-top: 1px solid #e5e7eb; padding-top: 14px; margin-top: 24px; font-style: italic; }
+  .footer { font-size: 8pt; color: #666; text-align: center; margin-top: 20px; padding-top: 10px; border-top: 1px solid #e5e7eb; }
+</style></head><body>
+<div class="header-bar"></div>
+<div class="brand">CCR EXPERT &nbsp;|&nbsp; ANALISE DE CREDITO RURAL</div>
+<h1>Relatorio de Conformidade</h1>
+<div class="subtitle">${report.subtitle}</div>
+<div class="meta">${report.meta}</div>
+<hr class="divider">
+
+<h2>1. IDENTIFICACAO DO CONTRATO</h2>
+${[["Contrato", data.contractId], ["Tipo", `${data.contractType} (Cedula de Credito Bancario)`], ["Instituicao", data.institution], ["Data", data.date], ["Valor", data.amount], ["Emitente", "Fazenda Boa Esperanca Ltda."]].map(([l, v]) => `<div class="field"><span class="field-label">${l}:</span> <span class="field-value">${v}</span></div>`).join("")}
+
+<h2>2. CLASSIFICACAO DOS RECURSOS</h2>
+<p><strong>Classificacao:</strong> ${data.resourceOrigin}</p>
+<p>O contrato foi formalizado como CCB (recursos livres), porem a analise identificou indicadores de credito direcionado: mencao a SICOR, finalidade de investimento rural, e referencia ao programa PRONAMP.</p>
+
+<h2>3. VERIFICACAO DE CONFORMIDADE (TAXAS)</h2>
+<table>
+<tr><th>Encargo</th><th>Contratado</th><th>Limite</th><th>Status</th></tr>
+<tr><td>Juros remuneratorios</td><td class="status-irregular">14,5% a.a.</td><td>12,0% a.a.</td><td class="status-irregular">IRREGULAR</td></tr>
+<tr><td>Teto PRONAMP</td><td class="status-irregular">14,5% a.a.</td><td>8,5% a.a.</td><td class="status-irregular">IRREGULAR</td></tr>
+<tr><td>Juros de mora</td><td>1,0% a.m.</td><td>1,0% a.m.</td><td class="status-regular">REGULAR</td></tr>
+<tr><td>Multa moratoria</td><td>2,0%</td><td>2,0%</td><td class="status-regular">REGULAR</td></tr>
+</table>
+
+<h2>4. IRREGULARIDADES IDENTIFICADAS</h2>
+${[...criticals, ...warnings].map((a) => `<div class="alert-block"><span class="alert-code">${a.code}</span> - ${a.title}<br>${a.description}<div class="alert-basis">Fundamento: ${a.legalBasis}</div></div>`).join("")}
+
+<h2>5. CONCLUSAO</h2>
+<div class="conclusion">A analise do contrato ${data.contractType} Nr. ${data.contractId} identificou <strong>${criticals.length} irregularidade(s) critica(s)</strong> e <strong>${warnings.length} ponto(s) de atencao</strong>. Recomenda-se a revisao contratual com possibilidade de acao revisional para adequacao dos encargos aos limites legais aplicaveis ao credito rural.</div>
+
+<h2>6. FUNDAMENTACAO JURIDICA</h2>
+<ul>
+<li>Art. 5, Decreto-Lei 167/1967 - Limite de juros para credito rural</li>
+<li>Lei 4.829/1965 - Institucionalizacao do credito rural</li>
+<li>Resolucao CMN 5.080/2023 - Manual de Credito Rural</li>
+<li>Art. 51, IV, CDC - Clausulas abusivas</li>
+<li>REsp 1.112.879/PR - Juros sujeitos a limites do DL 167/67</li>
+</ul>
+
+<div class="disclaimer">${report.disclaimer}</div>
+<div class="footer">${report.footer}</div>
+</body></html>`;
+
     const blob = new Blob(["\ufeff", html], { type: "application/msword" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -892,6 +1128,13 @@ function ReportPreview({ onNavigate }: { onNavigate: (tab: Tab) => void }) {
               Este relatorio foi gerado automaticamente pelo sistema CCR Expert e tem carater informativo.
               Os resultados devem ser validados por profissional habilitado (perito contabil ou advogado) antes de utilizacao em
               procedimentos judiciais ou extrajudiciais. O sistema nao substitui a analise profissional qualificada.
+            </p>
+          </div>
+
+          {/* Author footer */}
+          <div className="border-t border-gray-100 pt-4 mt-4 text-center">
+            <p className="text-xs text-gray-500 font-medium">
+              Elaborado por Carlos Chelfo &nbsp;|&nbsp; Todos os Direitos Reservados &nbsp;|&nbsp; Instagram: @Prof.CarlosChelfo
             </p>
           </div>
         </div>
